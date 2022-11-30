@@ -140,10 +140,10 @@ void eliminar_ficheiros() {
 	int del_count = 0, fail_count = 0;
 
 	while (n--) {
-		if (unlink(namelist[n]->d_name)) {
-			fail_count++;
-		} else {
+		if (unlink(namelist[n]->d_name) == 0) {
 			del_count++;
+		} else {
+			fail_count++;
 		}
 		free(namelist[n]);
 	}
