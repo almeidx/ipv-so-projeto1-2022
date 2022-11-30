@@ -75,6 +75,20 @@ int pso_extencao_filtro(const struct dirent *entry) {
 	return !strcmp(ext, ".pso");
 }
 
+int validate_scandir(int n) {
+	if (n == -1) {
+		printf("Não consegui ler a pasta\n");
+		return 0;
+	}
+
+	if (n == 0) {
+		printf("Não existem ficheiros .pso na pasta\n");
+		return 0;
+	}
+
+	return 1;
+}
+
 long get_file_size(char *filename) {
 	FILE *f = fopen(filename, "r");
 	if (!f)
@@ -95,27 +109,10 @@ void handle_sigint(int sig_num) {
 	raise(SIGKILL);
 }
 
-int abrir_pasta(struct dirent **namelist) {
-	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort);
-
-	if (n == -1) {
-		printf("Não consegui ler a pasta\n");
-		return -1;
-	}
-
-	if (n == 0) {
-		printf("Não existem ficheiros .pso na pasta\n");
-		return 0;
-	}
-
-	return n;
-}
-
 void mostrar_valores() {
 	struct dirent **namelist;
-	int n = abrir_pasta(namelist);
-
-	if (!n)
+	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort);
+	if (!validate_scandir(n))
 		return;
 
 	while (n--) {
@@ -136,20 +133,22 @@ void mostrar_valores() {
 
 void eliminar_ficheiros() {
 	struct dirent **namelist;
-	int n = abrir_pasta(namelist);
-
-	if (!n)
+	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort);
+	if (!validate_scandir(n))
 		return;
 
-	int del_count = 0;
+	int del_count = 0, fail_count = 0;
 
 	while (n--) {
-		unlink(namelist[n]->d_name);
+		if (unlink(namelist[n]->d_name)) {
+			fail_count++;
+		} else {
+			del_count++;
+		}
 		free(namelist[n]);
-		del_count++;
 	}
 
-	printf("Foram eliminados %d ficheiros\n", del_count);
+	printf("Foram eliminados %d ficheiros (%d falharam)\n", del_count, fail_count);
 
 	free(namelist);
 }
@@ -188,7 +187,6 @@ int main(int argc, char *argv[]) {
 
 	case 3:
 		eliminar_ficheiros();
-
 		break;
 
 	case 4:
