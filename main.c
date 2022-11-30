@@ -4,10 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
-int rand_number(int min, int max) { return rand() % (max - min + 1) + min; }
+int rand_number(int min, int max) {
+	return rand() % (max - min + 1) + min;
+}
 
 char *rand_text(char *s) {
 	char base[] = "Abram alas para o Noddy (Noddy) Com a buzina a tocar (ai ai ai) Abram alas para o Noddy (Noddy) "
@@ -42,6 +45,8 @@ void create_pid_file(int pid, int pid_pai) {
 }
 
 void criar_ficheiros() {
+	int status;
+
 	if (fork() == 0) {
 		int pid_filho1 = getpid();
 
@@ -55,13 +60,17 @@ void criar_ficheiros() {
 			create_pid_file(getpid(), getppid());
 		}
 
-		return;
+		exit(EXIT_SUCCESS);
 	} else {
 		if (fork() == 0) {
 			create_pid_file(getpid(), getppid());
-			return;
+			exit(EXIT_SUCCESS);
 		}
 	}
+
+	// esperar que todos os filhos terminem
+	while (wait(&status) > 0)
+		;
 }
 
 int pso_extencao_filtro(const struct dirent *entry) {
@@ -103,15 +112,16 @@ long get_file_size(char *filename) {
 	return bytes;
 }
 
-void handle_sigint(int sig_num) {
-	printf("Recebi sinal de SIGINT, a terminar com SIGKILL...\n");
-
-	raise(SIGKILL);
+void handle_sigint(int sig) {
+	if (sig == SIGINT) {
+		printf("Recebi sinal de SIGINT, a terminar com SIGKILL...\n");
+		raise(SIGKILL);
+	}
 }
 
 void mostrar_valores() {
 	struct dirent **namelist;
-	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort);
+	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort), status;
 	if (!validate_scandir(n))
 		return;
 
@@ -129,6 +139,10 @@ void mostrar_valores() {
 	}
 
 	free(namelist);
+
+	// esperar que todos os filhos terminem
+	while (wait(&status) > 0)
+		;
 }
 
 void eliminar_ficheiros() {
@@ -145,6 +159,7 @@ void eliminar_ficheiros() {
 		} else {
 			fail_count++;
 		}
+
 		free(namelist[n]);
 	}
 
@@ -157,41 +172,59 @@ void terminar() {
 	signal(SIGINT, handle_sigint);
 
 	if (fork() == 0) {
-		kill(getppid(), SIGINT);
+		int pid_pai = getppid();
+		printf("[%d] A enviar SIGINT a %d\n", getpid(), pid_pai);
+		kill(pid_pai, SIGINT);
+	} else {
+		// Esperar que o filho envie o sinal
+		while (1)
+			pause();
 	}
 }
 
 int main(int argc, char *argv[]) {
 	srand(time(NULL));
 
-	int option;
+	int times_ran = 0, option;
 
-	do {
-		printf("1. Criar ficheiros\n"
-			   "2. Mostrar valores\n"
-			   "3. Eliminar ficheiros\n"
-			   "4. Terminar\n");
+	while (1) {
+		do {
+			// Escrever uma linha em branco para separar as execuções, caso não seja a primeira vez
+			if (times_ran > 0)
+				printf("\n");
 
-		scanf("%d", &option);
-	} while (option < 1 || option > 4);
+			printf("1. Criar ficheiros\n"
+				   "2. Mostrar valores\n"
+				   "3. Eliminar ficheiros\n"
+				   "4. Terminar\n");
 
-	switch (option) {
-	case 1:
-		create_pid_file(getpid(), getppid());
-		criar_ficheiros();
-		break;
+			scanf("%d", &option);
+		} while (option < 1 || option > 4);
 
-	case 2:
-		mostrar_valores();
-		break;
+		switch (option) {
+		case 1:
+			create_pid_file(getpid(), getppid());
+			criar_ficheiros();
+			break;
 
-	case 3:
-		eliminar_ficheiros();
-		break;
+		case 2:
+			mostrar_valores();
+			break;
 
-	case 4:
-		terminar();
-		break;
+		case 3:
+			eliminar_ficheiros();
+			break;
+
+		case 4: {
+			terminar();
+			break;
+		}
+		}
+
+		if (option == 4)
+			break;
+
+		times_ran++;
 	}
 
 	return 0;
