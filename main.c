@@ -45,8 +45,6 @@ void create_pid_file(int pid, int pid_pai) {
 }
 
 void criar_ficheiros() {
-	int status;
-
 	if (fork() == 0) {
 		int pid_filho1 = getpid();
 
@@ -69,7 +67,7 @@ void criar_ficheiros() {
 	}
 
 	// esperar que todos os filhos terminem
-	while (wait(&status) > 0)
+	while (wait(NULL) > 0)
 		;
 }
 
@@ -121,7 +119,7 @@ void handle_sigint(int sig) {
 
 void mostrar_valores() {
 	struct dirent **namelist;
-	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort), status;
+	int n = scandir(".", &namelist, pso_extencao_filtro, alphasort);
 	if (!validate_scandir(n))
 		return;
 
@@ -141,7 +139,7 @@ void mostrar_valores() {
 	free(namelist);
 
 	// esperar que todos os filhos terminem
-	while (wait(&status) > 0)
+	while (wait(NULL) > 0)
 		;
 }
 
